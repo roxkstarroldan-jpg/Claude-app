@@ -28,5 +28,11 @@
     <string name="permission_needed">AdShield needs the VPN permission to block ads. Nothing leaves your phone; it filters lookups locally.</string>
     <string name="tips_header">Tips</string>
     <string name="tips">• Using Surfshark or another VPN? Android only runs one VPN at a time. Use AdShield when your VPN is off, and turn on CleanWeb in Surfshark when it is on.\n\n• To keep it running after restarts, open VPN settings, tap the gear next to AdShield and turn on \"Always-on VPN\".\n\n• If ads still get through, check Settings › Network › Private DNS is \"Off\" or \"Automatic\". A custom Private DNS provider skips AdShield.\n\n• In Chrome, turn off Settings › Privacy › \"Use secure DNS\" for the same reason.\n\n• If a site or app breaks, find it under \"Recently blocked\" and add it to \"Never block\".</string>
+    <string name="widget_description">Turn ad blocking on or off and see your current location</string>
+    <string name="widget_checking">Checking location…</string>
+    <string name="widget_tap_location">Tap to check location</string>
+    <string name="widget_status_on">Blocking ads · %1$,d blocked</string>
+    <string name="widget_status_off">Ad blocking is off</string>
+    <string name="widget_status_replaced">Off · another VPN is on</string>
     <string name="always_on">Open VPN settings</string>
 </resources>

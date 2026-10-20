@@ -15,6 +15,8 @@ final class Prefs {
     private static final String ALLOWED = "allowed_domains";
     private static final String BLOCKED = "blocked_domains";
     private static final String SOURCE_PREFIX = "source_";
+    private static final String LOCATION_FLAG = "location_flag";
+    private static final String LOCATION_NAME = "location_name";
 
     private final SharedPreferences p;
 
@@ -38,6 +40,19 @@ final class Prefs {
 
     void setReplacedByOtherVpn(boolean replaced) {
         p.edit().putBoolean(REPLACED_BY_OTHER_VPN, replaced).apply();
+    }
+
+    /** The last looked-up location, as shown on the widget, e.g. "Canada - Toronto". */
+    String locationName() {
+        return p.getString(LOCATION_NAME, "");
+    }
+
+    String locationFlag() {
+        return p.getString(LOCATION_FLAG, "");
+    }
+
+    void setLocation(String flag, String name) {
+        p.edit().putString(LOCATION_FLAG, flag).putString(LOCATION_NAME, name).apply();
     }
 
     boolean isSourceEnabled(BlocklistStore.Source s) {

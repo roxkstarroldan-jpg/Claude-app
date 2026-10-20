@@ -2,12 +2,8 @@ package com.adshield;
 
 import android.Manifest;
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.net.ConnectivityManager;
-import android.net.NetworkCapabilities;
-import android.net.VpnService;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -23,8 +19,6 @@ import android.widget.Toast;
 import java.util.List;
 
 public class MainActivity extends Activity {
-    private static final int REQUEST_VPN = 1;
-
     private Prefs prefs;
     private Button toggle;
     private TextView status;
@@ -58,20 +52,7 @@ public class MainActivity extends Activity {
         allowEdit = findViewById(R.id.allow_edit);
         blockEdit = findViewById(R.id.block_edit);
 
-        toggle.setOnClickListener(v -> {
-            if (BlockerVpnService.running) {
-                startService(serviceIntent(BlockerVpnService.ACTION_STOP));
-            } else if (otherVpnActive()) {
-                new AlertDialog.Builder(this)
-                    .setTitle(R.string.other_vpn_title)
-                    .setMessage(R.string.other_vpn_message)
-                    .setPositiveButton(R.string.turn_on_anyway, (d, w) -> startBlocking())
-                    .setNegativeButton(R.string.keep_other_vpn, null)
-                    .show();
-            } else {
-                startBlocking();
-            }
-        });
+        toggle.setOnClickListener(v -> startActivity(ToggleActivity.intent(this)));
 
         LinearLayout sources = findViewById(R.id.sources);
         for (BlocklistStore.Source s : BlocklistStore.SOURCES) {
@@ -106,35 +87,6 @@ public class MainActivity extends Activity {
         if (Build.VERSION.SDK_INT >= 33
                 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[] {Manifest.permission.POST_NOTIFICATIONS}, 0);
-        }
-    }
-
-    private void startBlocking() {
-        Intent consent = VpnService.prepare(this);
-        if (consent != null) {
-            startActivityForResult(consent, REQUEST_VPN);
-        } else {
-            onActivityResult(REQUEST_VPN, RESULT_OK, null);
-        }
-    }
-
-    /** True if another VPN app, like Surfshark, is connected. Only one VPN can run at a time. */
-    private boolean otherVpnActive() {
-        ConnectivityManager cm = getSystemService(ConnectivityManager.class);
-        NetworkCapabilities caps = cm.getNetworkCapabilities(cm.getActiveNetwork());
-        return caps != null && caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN);
-    }
-
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode != REQUEST_VPN) return;
-        if (resultCode == RESULT_OK) {
-            prefs.setEnabled(true);
-            prefs.setReplacedByOtherVpn(false);
-            startForegroundService(serviceIntent(BlockerVpnService.ACTION_START));
-        } else {
-            Toast.makeText(this, R.string.permission_needed, Toast.LENGTH_LONG).show();
         }
     }
 

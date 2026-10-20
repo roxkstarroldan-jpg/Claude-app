@@ -23,6 +23,21 @@ untouched, and nothing is sent to an outside server.
 - Block lists update every 3 days, only on Wi-Fi (unless a list is missing), and only
   when the network changes. No background timer checks for updates.
 
+## Home screen widget
+
+Long-press your home screen, tap **Widgets** and add **AdShield**. Like a VPN app's widget,
+it shows:
+
+- **Location:** where your internet traffic appears to come from, with its flag (for example
+  🇨🇦 Canada - Toronto). AdShield doesn't change your location, so this is your real
+  location, or your VPN server's when Surfshark (or another VPN) is on. Tap it to re-check.
+  The check uses [ipinfo.io](https://ipinfo.io) and only runs when you tap it, when
+  blocking turns on or off, or when your network changes while AdShield is on.
+- Whether ad blocking is on, and how many lookups it has blocked.
+- A big **Turn on / Turn off** button. If Surfshark is connected, it asks first.
+
+The widget has no update timer, so it costs no battery while it sits there.
+
 ## Block lists
 
 | List | Default | What it blocks |
