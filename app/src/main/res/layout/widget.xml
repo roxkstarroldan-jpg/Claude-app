@@ -44,7 +44,7 @@
             android:ellipsize="end"
             android:fontFamily="sans-serif-medium"
             android:singleLine="true"
-            android:text="@string/widget_tap_location"
+            android:text="@string/widget_locating"
             android:textColor="#FFFFFFFF"
             android:textSize="16sp" />
 

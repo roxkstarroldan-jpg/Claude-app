@@ -7,6 +7,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.telephony.TelephonyManager;
 import android.view.View;
 import android.widget.RemoteViews;
 
@@ -27,7 +28,6 @@ public class AdShieldWidget extends AppWidgetProvider {
 
     private static final ExecutorService worker = Executors.newSingleThreadExecutor();
     private static long lastLookupMs;
-    private static volatile boolean checking;
 
     @Override
     public void onUpdate(Context context, AppWidgetManager manager, int[] ids) {
@@ -60,18 +60,28 @@ public class AdShieldWidget extends AppWidgetProvider {
             if (pending != null) pending.finish();
             return;
         }
-        checking = true;
         redraw(app);
         worker.execute(() -> {
             try {
+                Prefs prefs = new Prefs(app);
                 LocationLookup.Result r = LocationLookup.lookup();
-                if (r != null) new Prefs(app).setLocation(r.flag, r.name);
+                // If every service failed and we know nothing yet, use the mobile network's
+                // country (no internet needed) rather than showing no location at all.
+                if (r == null && prefs.locationName().isEmpty()) r = networkCountry(app);
+                if (r != null) prefs.setLocation(r.flag, r.name);
             } finally {
-                checking = false;
                 redraw(app);
                 if (pending != null) pending.finish();
             }
         });
+    }
+
+    private static LocationLookup.Result networkCountry(Context app) {
+        TelephonyManager tm = app.getSystemService(TelephonyManager.class);
+        if (tm == null) return null;
+        String cc = tm.getNetworkCountryIso();
+        if (cc == null || cc.isEmpty()) cc = tm.getSimCountryIso();
+        return cc == null ? null : LocationLookup.fromCodes(cc, "");
     }
 
     private static synchronized boolean shouldLookUp(boolean force) {
@@ -102,8 +112,7 @@ public class AdShieldWidget extends AppWidgetProvider {
             v.setViewVisibility(R.id.widget_flag_image, View.GONE);
             v.setViewVisibility(R.id.widget_flag, View.VISIBLE);
         }
-        v.setTextViewText(R.id.widget_location, !location.isEmpty() ? location
-            : ctx.getString(checking ? R.string.widget_checking : R.string.widget_tap_location));
+        v.setTextViewText(R.id.widget_location, location.isEmpty() ? ctx.getString(R.string.widget_locating) : location);
         v.setImageViewResource(R.id.widget_shield, on ? R.drawable.ic_widget_shield_on : R.drawable.ic_widget_shield_off);
 
         v.setTextViewText(R.id.widget_button, ctx.getString(on ? R.string.turn_off : R.string.turn_on));
@@ -113,8 +122,11 @@ public class AdShieldWidget extends AppWidgetProvider {
 
         v.setOnClickPendingIntent(R.id.widget_button, PendingIntent.getActivity(ctx, 0,
             ToggleActivity.intent(ctx).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), PendingIntent.FLAG_IMMUTABLE));
-        v.setOnClickPendingIntent(R.id.widget_location_row, PendingIntent.getBroadcast(ctx, 0,
-            new Intent(ctx, AdShieldWidget.class).setAction(ACTION_REFRESH), PendingIntent.FLAG_IMMUTABLE));
+        PendingIntent refresh = PendingIntent.getBroadcast(ctx, 0,
+            new Intent(ctx, AdShieldWidget.class).setAction(ACTION_REFRESH), PendingIntent.FLAG_IMMUTABLE);
+        for (int id : new int[] {R.id.widget_location_row, R.id.widget_location, R.id.widget_flag, R.id.widget_flag_image}) {
+            v.setOnClickPendingIntent(id, refresh);
+        }
         v.setOnClickPendingIntent(R.id.widget_shield, PendingIntent.getActivity(ctx, 1,
             new Intent(ctx, MainActivity.class), PendingIntent.FLAG_IMMUTABLE));
         return v;

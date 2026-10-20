@@ -10,6 +10,7 @@ import android.util.Log;
 public class BootReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
+        AdShieldWidget.refresh(context);
         if (!new Prefs(context).isEnabled() || VpnService.prepare(context) != null) return;
         try {
             context.startForegroundService(

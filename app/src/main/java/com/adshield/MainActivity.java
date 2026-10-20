@@ -93,6 +93,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        AdShieldWidget.refresh(this); // keeps the widget's location current
         handler.post(refresher);
     }
 

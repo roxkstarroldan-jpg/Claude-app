@@ -14,9 +14,18 @@ import java.util.regex.Pattern;
 /**
  * Finds where this phone's internet traffic appears to come from, using the public IP
  * address. With a VPN like Surfshark on, that's the VPN server's location.
+ *
+ * Free lookup services rate-limit by IP address, and mobile carriers put many phones behind
+ * one address, so several services are tried in turn.
  */
 final class LocationLookup {
-    private static final String LOOKUP_URL = "https://ipinfo.io/json";
+    private static final String[] JSON_SERVICES = {
+        "https://ipinfo.io/json",                   // {"city": "Pune", "country": "IN"}
+        "https://get.geojs.io/v1/ip/geo.json",      // {"city": "Pune", "country_code": "IN"}
+        "https://ipapi.co/json/",                   // {"city": "Pune", "country_code": "IN"}
+    };
+    // Plain text with a "loc=IN" line; country only, but very reliable.
+    private static final String CLOUDFLARE_TRACE = "https://www.cloudflare.com/cdn-cgi/trace";
 
     static final class Result {
         final String flag;
@@ -30,28 +39,57 @@ final class LocationLookup {
 
     /** Returns the location, or null if it couldn't be found (e.g. offline). */
     static Result lookup() {
+        for (String url : JSON_SERVICES) {
+            String body = fetch(url);
+            Result r = body == null ? null : fromJson(body);
+            if (r != null) return r;
+        }
+        String trace = fetch(CLOUDFLARE_TRACE);
+        return trace == null ? null : fromTrace(trace);
+    }
+
+    /** Returns the response body, or null on any failure (offline, rate-limited, ...). */
+    private static String fetch(String url) {
         try {
-            HttpURLConnection c = (HttpURLConnection) new URL(LOOKUP_URL).openConnection();
-            c.setConnectTimeout(5000);
-            c.setReadTimeout(5000);
+            HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+            c.setConnectTimeout(4000);
+            c.setReadTimeout(4000);
             c.setRequestProperty("Accept", "application/json");
-            try (InputStream in = c.getInputStream()) {
-                ByteArrayOutputStream body = new ByteArrayOutputStream();
-                byte[] buf = new byte[4096];
-                int n;
-                while ((n = in.read(buf)) > 0 && body.size() < 64 * 1024) body.write(buf, 0, n);
-                return fromJson(body.toString(StandardCharsets.UTF_8.name()));
+            c.setRequestProperty("User-Agent", "AdShield");
+            try {
+                if (c.getResponseCode() != 200) return null;
+                try (InputStream in = c.getInputStream()) {
+                    ByteArrayOutputStream body = new ByteArrayOutputStream();
+                    byte[] buf = new byte[4096];
+                    int n;
+                    while ((n = in.read(buf)) > 0 && body.size() < 64 * 1024) body.write(buf, 0, n);
+                    return body.toString(StandardCharsets.UTF_8.name());
+                }
             } finally {
                 c.disconnect();
             }
-        } catch (IOException | RuntimeException e) { // offline, blocked, or a malformed reply
+        } catch (IOException | RuntimeException e) {
             return null;
         }
     }
 
-    /** Parses ipinfo.io's response, e.g. {"city": "Toronto", "country": "CA", ...}. */
+    /** Parses Cloudflare's trace output, which has a "loc=IN" line. */
+    static Result fromTrace(String trace) {
+        for (String line : trace.split("\n")) {
+            if (line.startsWith("loc=")) return fromCodes(line.substring(4), "");
+        }
+        return null;
+    }
+
+    /** Parses a lookup service's JSON, e.g. {"city": "Toronto", "country": "CA", ...}. */
     static Result fromJson(String json) {
-        return fromCodes(jsonString(json, "country"), jsonString(json, "city"));
+        try {
+            String cc = jsonString(json, "country_code");
+            if (cc.isEmpty()) cc = jsonString(json, "country"); // ipinfo puts the code here
+            return fromCodes(cc, jsonString(json, "city"));
+        } catch (RuntimeException e) { // malformed escape
+            return null;
+        }
     }
 
     /** Reads a top-level string field from a small flat JSON object, or returns "". */
