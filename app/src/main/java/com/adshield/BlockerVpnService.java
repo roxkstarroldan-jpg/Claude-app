@@ -137,8 +137,10 @@ public class BlockerVpnService extends VpnService {
 
     @Override
     public void onRevoke() {
-        // The user turned the VPN off in system settings, or another VPN app took over.
+        // Another VPN app (e.g. Surfshark) took over, or the user turned us off in system settings.
+        // Android allows only one VPN at a time.
         prefs.setEnabled(false);
+        prefs.setReplacedByOtherVpn(true);
         shutdown();
         stopForeground(STOP_FOREGROUND_REMOVE);
         stopSelf();

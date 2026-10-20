@@ -11,6 +11,7 @@ import java.util.Set;
 /** User settings, stored in SharedPreferences. */
 final class Prefs {
     private static final String ENABLED = "enabled";
+    private static final String REPLACED_BY_OTHER_VPN = "replaced_by_other_vpn";
     private static final String ALLOWED = "allowed_domains";
     private static final String BLOCKED = "blocked_domains";
     private static final String SOURCE_PREFIX = "source_";
@@ -28,6 +29,15 @@ final class Prefs {
 
     void setEnabled(boolean enabled) {
         p.edit().putBoolean(ENABLED, enabled).apply();
+    }
+
+    /** Whether AdShield was switched off because another VPN (e.g. Surfshark) took over. */
+    boolean wasReplacedByOtherVpn() {
+        return p.getBoolean(REPLACED_BY_OTHER_VPN, false);
+    }
+
+    void setReplacedByOtherVpn(boolean replaced) {
+        p.edit().putBoolean(REPLACED_BY_OTHER_VPN, replaced).apply();
     }
 
     boolean isSourceEnabled(BlocklistStore.Source s) {

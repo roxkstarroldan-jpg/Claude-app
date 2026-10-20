@@ -67,7 +67,10 @@ The other secrets are `KEYSTORE_PASSWORD`, `KEY_ALIAS` (`adshield`) and `KEY_PAS
   For the most complete blocking in a browser, also use Firefox with uBlock Origin.
 - **Private DNS:** if Settings › Network › Private DNS is set to a provider hostname, Android
   skips AdShield. Set it to "Off" or "Automatic".
-- Only one VPN app can run at a time on Android.
+- **Only one VPN app can run at a time on Android.** If you use Surfshark (or another
+  VPN), turning one on disconnects the other. AdShield warns you before taking over and
+  tells you if Surfshark replaced it. While Surfshark is connected, turn on Surfshark's
+  **CleanWeb** setting to keep blocking ads.
 
 ### iPhone?
 

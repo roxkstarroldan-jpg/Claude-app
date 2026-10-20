@@ -2,8 +2,11 @@ package com.adshield;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.net.ConnectivityManager;
+import android.net.NetworkCapabilities;
 import android.net.VpnService;
 import android.os.Build;
 import android.os.Bundle;
@@ -58,13 +61,15 @@ public class MainActivity extends Activity {
         toggle.setOnClickListener(v -> {
             if (BlockerVpnService.running) {
                 startService(serviceIntent(BlockerVpnService.ACTION_STOP));
+            } else if (otherVpnActive()) {
+                new AlertDialog.Builder(this)
+                    .setTitle(R.string.other_vpn_title)
+                    .setMessage(R.string.other_vpn_message)
+                    .setPositiveButton(R.string.turn_on_anyway, (d, w) -> startBlocking())
+                    .setNegativeButton(R.string.keep_other_vpn, null)
+                    .show();
             } else {
-                Intent consent = VpnService.prepare(this);
-                if (consent != null) {
-                    startActivityForResult(consent, REQUEST_VPN);
-                } else {
-                    onActivityResult(REQUEST_VPN, RESULT_OK, null);
-                }
+                startBlocking();
             }
         });
 
@@ -104,12 +109,29 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void startBlocking() {
+        Intent consent = VpnService.prepare(this);
+        if (consent != null) {
+            startActivityForResult(consent, REQUEST_VPN);
+        } else {
+            onActivityResult(REQUEST_VPN, RESULT_OK, null);
+        }
+    }
+
+    /** True if another VPN app, like Surfshark, is connected. Only one VPN can run at a time. */
+    private boolean otherVpnActive() {
+        ConnectivityManager cm = getSystemService(ConnectivityManager.class);
+        NetworkCapabilities caps = cm.getNetworkCapabilities(cm.getActiveNetwork());
+        return caps != null && caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN);
+    }
+
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode != REQUEST_VPN) return;
         if (resultCode == RESULT_OK) {
             prefs.setEnabled(true);
+            prefs.setReplacedByOtherVpn(false);
             startForegroundService(serviceIntent(BlockerVpnService.ACTION_START));
         } else {
             Toast.makeText(this, R.string.permission_needed, Toast.LENGTH_LONG).show();
@@ -141,7 +163,8 @@ public class MainActivity extends Activity {
     private void updateUi() {
         boolean on = BlockerVpnService.running;
         toggle.setText(on ? R.string.turn_off : R.string.turn_on);
-        status.setText(on ? R.string.status_on : R.string.status_off);
+        status.setText(on ? R.string.status_on
+            : prefs.wasReplacedByOtherVpn() ? R.string.status_replaced : R.string.status_off);
         if (on) {
             stats.setText(getString(R.string.stats,
                 BlockerVpnService.blockedCount.get(), BlockerVpnService.queryCount.get()));
