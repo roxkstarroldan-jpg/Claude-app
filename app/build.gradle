@@ -16,14 +16,21 @@ android {
     }
 
     signingConfigs {
-        // Set these (e.g. as GitHub secrets) to sign with your own key, so new builds
-        // install as updates. Without them, release builds use the debug key.
-        if (System.getenv('KEYSTORE_FILE')) {
-            release {
+        // Every build must be signed with the same key, or Android refuses to install it as
+        // an update ("App not installed"). This key is committed so CI builds always match.
+        // It's public, so only install AdShield from this repo's Releases page.
+        // To use a private key instead, set KEYSTORE_FILE and friends (e.g. GitHub secrets).
+        release {
+            if (System.getenv('KEYSTORE_FILE')) {
                 storeFile file(System.getenv('KEYSTORE_FILE'))
                 storePassword System.getenv('KEYSTORE_PASSWORD')
                 keyAlias System.getenv('KEY_ALIAS')
                 keyPassword System.getenv('KEY_PASSWORD')
+            } else {
+                storeFile file('adshield.jks')
+                storePassword 'adshield'
+                keyAlias 'adshield'
+                keyPassword 'adshield'
             }
         }
     }
@@ -33,7 +40,7 @@ android {
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt')
-            signingConfig System.getenv('KEYSTORE_FILE') ? signingConfigs.release : signingConfigs.debug
+            signingConfig signingConfigs.release
         }
     }
 

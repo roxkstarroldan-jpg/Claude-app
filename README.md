@@ -63,16 +63,13 @@ Every push to the repo builds a new APK automatically
 
 ### Installing updates
 
-By default, CI builds are signed with a temporary key. If Android won't install a new
-build over the old one, uninstall the old one first. To keep the same key across builds,
-create a keystore once and add these repository secrets:
+Every build is signed with the same key (`app/adshield.jks`), so a new APK installs
+over the old one. If you installed build 1, 2 or 3, uninstall it once first; those
+used a temporary key.
 
-```sh
-keytool -genkeypair -v -keystore release.jks -alias adshield -keyalg RSA -keysize 2048 -validity 10000
-base64 -w0 release.jks   # paste the output into the KEYSTORE_BASE64 secret
-```
-
-The other secrets are `KEYSTORE_PASSWORD`, `KEY_ALIAS` (`adshield`) and `KEY_PASSWORD`.
+The key is committed to this public repo, so anyone could sign an app with it. Only
+install AdShield from this repo's Releases page. To use a private key instead, add the
+repository secrets `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS` and `KEY_PASSWORD`.
 
 ## Limits (what DNS blocking can't do)
 
