@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AdShield</string>
+    <string name="channel_name">Blocking status</string>
+    <string name="notification_title">AdShield is blocking ads</string>
+    <string name="turn_on">Turn on</string>
+    <string name="turn_off">Turn off</string>
+    <string name="status_on">Blocking ads, trackers and malicious redirects</string>
+    <string name="status_off">Off. Ads are not being blocked.</string>
+    <string name="stats">Blocked %1$,d of %2$,d lookups</string>
+    <string name="lists_header">Block lists</string>
+    <string name="update_now">Update lists now</string>
+    <string name="updating">Updating block lists…</string>
+    <string name="turn_on_first">Turn AdShield on first</string>
+    <string name="recent_header">Recently blocked</string>
+    <string name="nothing_yet">Nothing yet</string>
+    <string name="allow_header">Never block (one site per line)</string>
+    <string name="allow_hint">example.com</string>
+    <string name="block_header">Always block (one site per line)</string>
+    <string name="block_hint">annoying-site.com</string>
+    <string name="save">Save</string>
+    <string name="saved">Saved</string>
+    <string name="permission_needed">AdShield needs the VPN permission to block ads. Nothing leaves your phone; it filters lookups locally.</string>
+    <string name="tips_header">Tips</string>
+    <string name="tips">• To keep it running after restarts, open VPN settings, tap the gear next to AdShield and turn on \"Always-on VPN\".\n\n• If ads still get through, check Settings › Network › Private DNS is \"Off\" or \"Automatic\". A custom Private DNS provider skips AdShield.\n\n• In Chrome, turn off Settings › Privacy › \"Use secure DNS\" for the same reason.\n\n• If a site or app breaks, find it under \"Recently blocked\" and add it to \"Never block\".</string>
+    <string name="always_on">Open VPN settings</string>
+</resources>
