@@ -6,15 +6,17 @@ import android.appwidget.AppWidgetProvider;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.view.View;
 import android.widget.RemoteViews;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * Home screen widget: shows where your internet traffic appears to come from (your real
- * location, or your VPN server's when e.g. Surfshark is on), whether blocking is on, and a
- * big on/off button.
+ * Home screen widget styled like a VPN app's: the flag and location your internet traffic
+ * appears to come from (your real location, or your VPN server's when e.g. Surfshark is
+ * on), a shield showing whether blocking is on, and a big on/off button.
  *
  * Battery: it never updates on a timer. It redraws when blocking turns on or off or the
  * network changes, and re-checks the location only then or when you tap it.
@@ -88,21 +90,26 @@ public class AdShieldWidget extends AppWidgetProvider {
         boolean on = BlockerVpnService.running;
         RemoteViews v = new RemoteViews(ctx.getPackageName(), R.layout.widget);
 
+        // Like a VPN app's widget: flag and location, a status shield, and one big button.
         String location = prefs.locationName();
-        v.setTextViewText(R.id.widget_flag, location.isEmpty() ? "🌐" : prefs.locationFlag()); // 🌐
-        v.setTextViewText(R.id.widget_location, checking ? ctx.getString(R.string.widget_checking)
-            : location.isEmpty() ? ctx.getString(R.string.widget_tap_location) : location);
-
-        String status = on
-            ? ctx.getString(R.string.widget_status_on, BlockerVpnService.blockedCount.get())
-            : ctx.getString(prefs.wasReplacedByOtherVpn() ? R.string.widget_status_replaced : R.string.widget_status_off);
-        v.setTextViewText(R.id.widget_status, status);
+        Bitmap flag = location.isEmpty() ? null : FlagImage.render(ctx, prefs.locationFlag());
+        if (flag != null) {
+            v.setImageViewBitmap(R.id.widget_flag_image, flag);
+            v.setViewVisibility(R.id.widget_flag_image, View.VISIBLE);
+            v.setViewVisibility(R.id.widget_flag, View.GONE);
+        } else {
+            v.setTextViewText(R.id.widget_flag, location.isEmpty() ? "\uD83C\uDF10" : prefs.locationFlag()); // 🌐
+            v.setViewVisibility(R.id.widget_flag_image, View.GONE);
+            v.setViewVisibility(R.id.widget_flag, View.VISIBLE);
+        }
+        v.setTextViewText(R.id.widget_location, !location.isEmpty() ? location
+            : ctx.getString(checking ? R.string.widget_checking : R.string.widget_tap_location));
         v.setImageViewResource(R.id.widget_shield, on ? R.drawable.ic_widget_shield_on : R.drawable.ic_widget_shield_off);
 
         v.setTextViewText(R.id.widget_button, ctx.getString(on ? R.string.turn_off : R.string.turn_on));
         v.setInt(R.id.widget_button, "setBackgroundResource",
             on ? R.drawable.widget_button_off : R.drawable.widget_button_on);
-        v.setTextColor(R.id.widget_button, on ? 0xFFFFFFFF : 0xFF000000);
+        v.setTextColor(R.id.widget_button, on ? 0xFFFFFFFF : 0xFF0B1D1E);
 
         v.setOnClickPendingIntent(R.id.widget_button, PendingIntent.getActivity(ctx, 0,
             ToggleActivity.intent(ctx).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), PendingIntent.FLAG_IMMUTABLE));

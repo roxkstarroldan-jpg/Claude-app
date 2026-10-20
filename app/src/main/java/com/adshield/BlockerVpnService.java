@@ -65,7 +65,6 @@ public class BlockerVpnService extends VpnService {
     private static final String CHANNEL_ID = "status";
     private static final int UPSTREAM_TIMEOUT_MS = 2500;
     private static final int RECENT_MAX = 30;
-    private static final long WIDGET_COUNT_INTERVAL_MS = 60_000;
 
     // Status for the UI.
     static volatile boolean running;
@@ -89,7 +88,6 @@ public class BlockerVpnService extends VpnService {
     private FileOutputStream tunOut;
     private FileDescriptor stopSignal;
     private Thread loopThread;
-    private volatile long lastWidgetRedrawMs;
 
     static synchronized List<String> recentBlocked() {
         return new ArrayList<>(recentBlocked);
@@ -290,7 +288,6 @@ public class BlockerVpnService extends VpnService {
             blockedCount.incrementAndGet();
             recordBlocked(query.name);
             write(out, query.blockedResponse());
-            maybeRedrawWidget();
             return;
         }
         try {
@@ -298,14 +295,6 @@ public class BlockerVpnService extends VpnService {
         } catch (RejectedExecutionException ignored) {
             // Too many lookups in flight or shutting down; the app will retry.
         }
-    }
-
-    /** Keeps the widget's blocked count roughly current, redrawing at most once a minute. */
-    private void maybeRedrawWidget() {
-        long now = System.currentTimeMillis();
-        if (now - lastWidgetRedrawMs < WIDGET_COUNT_INTERVAL_MS) return;
-        lastWidgetRedrawMs = now;
-        background.execute(() -> AdShieldWidget.redraw(this));
     }
 
     private boolean isAllowed(String domain) {

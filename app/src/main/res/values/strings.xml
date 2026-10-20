@@ -31,8 +31,5 @@
     <string name="widget_description">Turn ad blocking on or off and see your current location</string>
     <string name="widget_checking">Checking location…</string>
     <string name="widget_tap_location">Tap to check location</string>
-    <string name="widget_status_on">Blocking ads · %1$,d blocked</string>
-    <string name="widget_status_off">Ad blocking is off</string>
-    <string name="widget_status_replaced">Off · another VPN is on</string>
     <string name="always_on">Open VPN settings</string>
 </resources>
