@@ -8,12 +8,18 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ServiceInfo;
 import android.graphics.drawable.Icon;
+import android.content.Context;
 import android.net.ConnectivityManager;
 import android.net.LinkProperties;
 import android.net.Network;
+import android.net.NetworkCapabilities;
+import android.net.NetworkRequest;
 import android.net.VpnService;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.ParcelFileDescriptor;
+import android.os.Process;
 import android.system.ErrnoException;
 import android.system.Os;
 import android.system.OsConstants;
@@ -32,6 +38,7 @@ import java.net.UnknownHostException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -52,7 +59,10 @@ import java.util.concurrent.atomic.AtomicLong;
  * DNS query arrives, and the forwarding threads exit after 30 s of inactivity.
  */
 public class BlockerVpnService extends VpnService {
+    /** Turn on now, even if that disconnects another VPN (the user asked for it). */
     static final String ACTION_START = "com.adshield.START";
+    /** Turn on after a reboot, update or restart, but wait if another VPN like Surfshark is on. */
+    static final String ACTION_AUTO_START = "com.adshield.AUTO_START";
     static final String ACTION_STOP = "com.adshield.STOP";
     static final String ACTION_RELOAD = "com.adshield.RELOAD";
     static final String ACTION_UPDATE = "com.adshield.UPDATE";
@@ -65,9 +75,17 @@ public class BlockerVpnService extends VpnService {
     private static final String CHANNEL_ID = "status";
     private static final int UPSTREAM_TIMEOUT_MS = 2500;
     private static final int RECENT_MAX = 30;
+    // After the other VPN disconnects, wait this long before turning back on, so switching
+    // Surfshark servers (a quick disconnect and reconnect) doesn't trigger it.
+    private static final long OTHER_VPN_SETTLE_MS = 5_000;
+    // After we're switched off, how long to wait for another VPN to appear. If none does, the
+    // user turned us off in system settings, so we stay off.
+    private static final long OTHER_VPN_APPEAR_MS = 30_000;
 
     // Status for the UI.
     static volatile boolean running;
+    /** Off because another VPN (like Surfshark) is on; turns back on when it disconnects. */
+    static volatile boolean paused;
     static volatile String listStatus = "";
     static final AtomicLong blockedCount = new AtomicLong();
     static final AtomicLong queryCount = new AtomicLong();
@@ -89,6 +107,22 @@ public class BlockerVpnService extends VpnService {
     private FileDescriptor stopSignal;
     private Thread loopThread;
 
+    // Watching for the other VPN to disconnect. Main thread only.
+    private final Handler main = new Handler(Looper.getMainLooper());
+    private ConnectivityManager.NetworkCallback otherVpnWatcher;
+    private final Set<Network> otherVpns = new HashSet<>();
+    private boolean sawOtherVpn;
+    private final Runnable resumeIfNoOtherVpn = () -> {
+        if (otherVpns.isEmpty()) resume();
+    };
+    private final Runnable stopIfNoOtherVpnAppeared = () -> {
+        if (!sawOtherVpn) {
+            prefs.setEnabled(false);
+            prefs.setReplacedByOtherVpn(false);
+            stopEverything();
+        }
+    };
+
     static synchronized List<String> recentBlocked() {
         return new ArrayList<>(recentBlocked);
     }
@@ -109,20 +143,30 @@ public class BlockerVpnService extends VpnService {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         // A null intent or the VpnService action means a restart by the system or always-on VPN.
-        String action = intent == null ? ACTION_START : intent.getAction();
+        String action = intent == null || intent.getAction() == null ? ACTION_AUTO_START : intent.getAction();
         if (ACTION_STOP.equals(action)) {
             prefs.setEnabled(false);
-            shutdown();
-            stopForeground(STOP_FOREGROUND_REMOVE);
-            stopSelf();
+            prefs.setReplacedByOtherVpn(false);
+            stopEverything();
             return START_NOT_STICKY;
         }
 
-        showForegroundNotification();
-        if (!running && !startVpn()) {
-            stopForeground(STOP_FOREGROUND_REMOVE);
-            stopSelf();
-            return START_NOT_STICKY;
+        if (!running) {
+            boolean userAsked = ACTION_START.equals(action);
+            if (!userAsked && otherVpnActive(this)) {
+                pause(); // don't kick Surfshark off; turn on when it disconnects
+                return START_STICKY;
+            }
+            stopWatchingOtherVpn();
+            paused = false;
+            showForegroundNotification(false);
+            // VpnService.prepare() would disconnect another VPN, so it's only called here, once
+            // we know none is on (or the user asked). It needs no prompt once consent was given.
+            if ((!userAsked && VpnService.prepare(this) != null) || !startVpn()) {
+                stopEverything();
+                return START_NOT_STICKY;
+            }
+            prefs.setReplacedByOtherVpn(false);
         }
         if (ACTION_RELOAD.equals(action)) {
             background.execute(() -> {
@@ -137,18 +181,101 @@ public class BlockerVpnService extends VpnService {
 
     @Override
     public void onRevoke() {
-        // Another VPN app (e.g. Surfshark) took over, or the user turned us off in system settings.
-        // Android allows only one VPN at a time.
-        prefs.setEnabled(false);
-        prefs.setReplacedByOtherVpn(true);
+        // Android allows one VPN at a time, so another VPN app (e.g. Surfshark) connecting
+        // switches us off; so does "Disconnect" in system settings. Wait and see which it was.
         shutdown();
+        pause();
+        main.postDelayed(stopIfNoOtherVpnAppeared, OTHER_VPN_APPEAR_MS);
+    }
+
+    /** Waits, without blocking anything, for the other VPN to disconnect. */
+    private void pause() {
+        paused = true;
+        prefs.setReplacedByOtherVpn(true);
+        showForegroundNotification(true);
+        watchOtherVpn();
+        AdShieldWidget.refresh(this);
+    }
+
+    /** The other VPN disconnected: turn blocking back on. */
+    private void resume() {
+        stopWatchingOtherVpn();
+        paused = false;
+        // Consent can be taken away (e.g. another VPN set as "Always-on"); then stay off.
+        if (VpnService.prepare(this) != null) {
+            prefs.setEnabled(false);
+            stopEverything();
+            return;
+        }
+        showForegroundNotification(false);
+        if (startVpn()) {
+            prefs.setReplacedByOtherVpn(false);
+        } else {
+            stopEverything();
+        }
+    }
+
+    private void watchOtherVpn() {
+        if (otherVpnWatcher != null) return;
+        otherVpns.clear();
+        sawOtherVpn = false;
+        NetworkRequest vpnNetworks = new NetworkRequest.Builder()
+            .addTransportType(NetworkCapabilities.TRANSPORT_VPN)
+            .removeCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
+            .build();
+        otherVpnWatcher = new ConnectivityManager.NetworkCallback() {
+            @Override
+            public void onCapabilitiesChanged(Network network, NetworkCapabilities caps) {
+                // Ignore our own VPN if it's still being torn down.
+                if (Build.VERSION.SDK_INT >= 29 && caps.getOwnerUid() == Process.myUid()) return;
+                otherVpns.add(network);
+                sawOtherVpn = true;
+                main.removeCallbacks(resumeIfNoOtherVpn);
+            }
+
+            @Override
+            public void onLost(Network network) {
+                if (otherVpns.remove(network) && otherVpns.isEmpty()) {
+                    main.removeCallbacks(resumeIfNoOtherVpn);
+                    main.postDelayed(resumeIfNoOtherVpn, OTHER_VPN_SETTLE_MS);
+                }
+            }
+        };
+        getSystemService(ConnectivityManager.class).registerNetworkCallback(vpnNetworks, otherVpnWatcher, main);
+    }
+
+    private void stopWatchingOtherVpn() {
+        main.removeCallbacks(resumeIfNoOtherVpn);
+        main.removeCallbacks(stopIfNoOtherVpnAppeared);
+        if (otherVpnWatcher != null) {
+            getSystemService(ConnectivityManager.class).unregisterNetworkCallback(otherVpnWatcher);
+            otherVpnWatcher = null;
+        }
+        otherVpns.clear();
+    }
+
+    private void stopEverything() {
+        shutdown();
+        stopWatchingOtherVpn();
+        paused = false;
         stopForeground(STOP_FOREGROUND_REMOVE);
         stopSelf();
+        AdShieldWidget.refresh(this);
+    }
+
+    /** True if another VPN app, like Surfshark, is connected. */
+    static boolean otherVpnActive(Context context) {
+        if (running) return false;
+        ConnectivityManager cm = context.getSystemService(ConnectivityManager.class);
+        NetworkCapabilities caps = cm.getNetworkCapabilities(cm.getActiveNetwork());
+        return caps != null && caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN);
     }
 
     @Override
     public void onDestroy() {
         shutdown();
+        stopWatchingOtherVpn();
+        paused = false;
         background.shutdownNow();
         super.onDestroy();
     }
@@ -403,7 +530,7 @@ public class BlockerVpnService extends VpnService {
 
     // ---- notification -----------------------------------------------------------------------
 
-    private void showForegroundNotification() {
+    private void showForegroundNotification(boolean paused) {
         NotificationManager nm = getSystemService(NotificationManager.class);
         NotificationChannel channel = new NotificationChannel(
             CHANNEL_ID, getString(R.string.channel_name), NotificationManager.IMPORTANCE_MIN);
@@ -412,14 +539,15 @@ public class BlockerVpnService extends VpnService {
 
         PendingIntent stop = PendingIntent.getService(this, 1,
             new Intent(this, BlockerVpnService.class).setAction(ACTION_STOP), PendingIntent.FLAG_IMMUTABLE);
-        Notification n = new Notification.Builder(this, CHANNEL_ID)
+        Notification.Builder b = new Notification.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_shield)
-            .setContentTitle(getString(R.string.notification_title))
+            .setContentTitle(getString(paused ? R.string.notification_paused_title : R.string.notification_title))
             .setContentIntent(openAppIntent())
             .addAction(new Notification.Action.Builder((Icon) null, getString(R.string.turn_off), stop).build())
             .setOngoing(true)
-            .setShowWhen(false)
-            .build();
+            .setShowWhen(false);
+        if (paused) b.setContentText(getString(R.string.notification_paused_text));
+        Notification n = b.build();
         if (Build.VERSION.SDK_INT >= 34) {
             startForeground(NOTIFICATION_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
         } else {

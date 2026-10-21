@@ -55,8 +55,8 @@ You can also add your own **Never block** and **Always block** sites in the app.
 2. Download `AdShield.apk` on your phone and open it. If Android asks, allow your browser
    to "Install unknown apps".
 3. Open AdShield and tap **Turn on**, then accept the VPN request.
-4. Recommended: tap **Open VPN settings**, tap the gear next to AdShield and turn on
-   **Always-on VPN**. Android then keeps it running and restarts it after a reboot.
+4. AdShield turns itself back on after a reboot. If you don't use another VPN, you can
+   also turn on **Always-on VPN** for it (VPN settings, gear next to AdShield).
 
 Every push to the repo builds a new APK automatically
 (see `.github/workflows/build.yml`).
@@ -79,10 +79,12 @@ repository secrets `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS` and `KEY_
   For the most complete blocking in a browser, also use Firefox with uBlock Origin.
 - **Private DNS:** if Settings › Network › Private DNS is set to a provider hostname, Android
   skips AdShield. Set it to "Off" or "Automatic".
-- **Only one VPN app can run at a time on Android.** If you use Surfshark (or another
-  VPN), turning one on disconnects the other. AdShield warns you before taking over and
-  tells you if Surfshark replaced it. While Surfshark is connected, turn on Surfshark's
-  **CleanWeb** setting to keep blocking ads.
+- **Only one VPN app can run at a time on Android.** With Surfshark (or another VPN),
+  you can switch freely: connecting Surfshark pauses AdShield, and AdShield turns itself
+  back on about 5 seconds after Surfshark disconnects (it waits briefly so switching
+  servers doesn't trigger it). While Surfshark is on, turn on its **CleanWeb** setting to
+  keep blocking ads. Don't use "Always-on VPN" for either app, since it stops the other
+  one from connecting.
 
 ### iPhone?
 

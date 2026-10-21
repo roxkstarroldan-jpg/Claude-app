@@ -4,8 +4,6 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
-import android.net.ConnectivityManager;
-import android.net.NetworkCapabilities;
 import android.net.VpnService;
 import android.os.Bundle;
 import android.widget.Toast;
@@ -30,7 +28,7 @@ public class ToggleActivity extends Activity {
         if (BlockerVpnService.running) {
             startService(serviceIntent(BlockerVpnService.ACTION_STOP));
             finish();
-        } else if (otherVpnActive()) {
+        } else if (BlockerVpnService.otherVpnActive(this)) {
             new AlertDialog.Builder(this)
                 .setTitle(R.string.other_vpn_title)
                 .setMessage(R.string.other_vpn_message)
@@ -69,12 +67,5 @@ public class ToggleActivity extends Activity {
 
     private Intent serviceIntent(String action) {
         return new Intent(this, BlockerVpnService.class).setAction(action);
-    }
-
-    /** True if another VPN app, like Surfshark, is connected. Only one VPN can run at a time. */
-    private boolean otherVpnActive() {
-        ConnectivityManager cm = getSystemService(ConnectivityManager.class);
-        NetworkCapabilities caps = cm.getNetworkCapabilities(cm.getActiveNetwork());
-        return caps != null && caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN);
     }
 }
