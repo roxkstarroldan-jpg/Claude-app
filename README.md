@@ -45,6 +45,8 @@ The widget has no update timer, so it costs no battery while it sits there.
 | [HaGeZi Pro](https://github.com/hagezi/dns-blocklists) | on | Ads, trackers, analytics |
 | HaGeZi Pop-Up Ads | on | Pop-ups, pop-unders and redirect ad networks |
 | HaGeZi Threat Intelligence (mini) | on | Scam, phishing and malware redirects |
+| HaGeZi Samsung Tracker | on | Samsung phones sending usage data to Samsung |
+| StevenBlack fake news | on | Known fake news and clickbait sites |
 | StevenBlack unified hosts | off | Extra ads and malware coverage |
 
 You can also add your own **Never block** and **Always block** sites in the app.

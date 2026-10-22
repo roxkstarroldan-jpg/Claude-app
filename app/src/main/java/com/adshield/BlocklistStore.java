@@ -37,6 +37,10 @@ final class BlocklistStore {
             "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/popupads-onlydomains.txt", true),
         new Source("hagezi_tif_mini", "Scam, malware & phishing redirects (HaGeZi Threat mini)",
             "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/tif.mini-onlydomains.txt", true),
+        new Source("hagezi_samsung", "Samsung phone tracking (HaGeZi Samsung Tracker)",
+            "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/native.samsung-onlydomains.txt", true),
+        new Source("fakenews", "Fake news & clickbait sites (StevenBlack fake news)",
+            "https://raw.githubusercontent.com/StevenBlack/hosts/master/alternates/fakenews-only/hosts", true),
         new Source("stevenblack", "Extra: StevenBlack unified hosts",
             "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts", false),
     };
